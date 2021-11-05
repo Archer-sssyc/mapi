@@ -8,16 +8,16 @@ from pyspark.sql.functions import udf
 from pyspark.sql.types import StringType, ArrayType, StructType, StructField, BooleanType, IntegerType
 
 action = "/Users/fugui/Work/NWCD/ohla/mapi/resource/action.csv"
-items = "/Users/fugui/Work/NWCD/ohla/mapi/resource/item.csv"
-
-item_schema = StructType([
-    StructField("item_id", StringType()),
-    StructField("item_detail", StringType()),
-])
+item = "/Users/fugui/Work/NWCD/ohla/mapi/resource/item.csv"
 
 action_schema = StructType([
     StructField("user_id", StringType()),
     StructField("item_id", StringType()),
+])
+
+item_schema = StructType([
+    StructField("item_id", StringType()),
+    StructField("item_desc", StringType()),
 ])
 
 
@@ -35,7 +35,7 @@ def extract_item(message_str):
     t = message_str.split("_!_")
     return json.dumps({
         "item_id": t[0],
-        "detail": t[2]
+        "item_desc": t[2]
     })
 
 
@@ -60,6 +60,19 @@ action_df = action_df.withColumn("item_id", F.col("data.item_id"))
 action_df = action_df.select("user_id", "item_id")
 action_df.printSchema()
 action_df.show(10)
+
+# item_df = spark.read.format("text").option("multiLine", "false").text(item)
+# filter empty row
+# item_df = item_df.filter("value is not null")
+
+# item_df = item_df.withColumn("data", extract_item(F.col("value")))
+# item_df = item_df.select("data")
+# item_df = item_df.withColumn("data", F.from_json(F.col("data"), item_schema))
+# item_df = item_df.withColumn("item_id", F.col("data.item_id"))
+# item_df = item_df.withColumn("detail", F.col("data.item_desc"))
+# item_df = item_df.select("item_id", "detail")
+# item_df.printSchema()
+# item_df.show(10)
 # dyn_df = DynamicFrame.fromDF(df, glueContext, "nested")
 #
 # glueContext.write_dynamic_frame.from_options(frame=dyn_df,
