@@ -1,35 +1,56 @@
-from pyspark.sql import functions as F
-from pyspark.sql.functions import udf
-from pyspark.sql.types import StringType
+import pickle
+import boto3
+import sys
+
+from awsglue.dynamicframe import DynamicFrame
+from awsglue.utils import getResolvedOptions
 from pyspark.sql import SparkSession
 from pyspark.context import SparkContext
-import pickle
-import pandas as pd
+from awsglue.context import GlueContext
+from awsglue.job import Job
 
-if __name__ == '__main__':
-    objects = list()
-    file_path = "/Users/fugui/Work/NWCD/ohla/mapi/resource/filter_batch_result.pickle"
-    with open(file_path, "rb") as openfile:
-        while True:
-            try:
-                u = pickle.load(openfile)
-                for (k, v) in u.items():
-                    for (item_key, items) in v.items():
-                        entity = dict()
-                        entity["user_id"] = k
-                        entity["item_id"] = item_key
-                        entity["action"] = items[1]
-                        entity["ratio"] = float(items[2])
-                        entity["detail"] = items[3]
-                        objects.append(entity)
-            except EOFError:
-                break
+file_path = "s3://example-data/ohla/filter_batch_result.pickle"
+objects = list()
 
-    t = [item for item in objects if item["ratio"] > 0]
-    print(t[0:10])
-    spark = SparkSession.builder.appName("test").getOrCreate()
-    df = spark.createDataFrame(objects)
-    df.printSchema()
-    df = df.select("user_id", "item_id", "ratio", "action", "detail")
-    df = df.filter(df["ratio"] > 0)
-    df.show(10)
+
+s3 = boto3.resource('s3',
+                    aws_access_key_id="AKIAQMS6D5EI3FOTFUE4",
+                    aws_secret_access_key="you key",
+                    region_name="cn-northwest-1")
+bucket = s3.Bucket('example-data')
+data = bucket.Object("ohla/filter_batch_result.pickle").get()['Body'].read()
+
+u = pickle.loads(data)
+for (k, v) in u.items():
+    for (item_key, items) in v.items():
+        entity = dict()
+        entity["user_id"] = k
+        entity["item_id"] = item_key
+        entity["action"] = items[1]
+        entity["ratio"] = float(items[2])
+        entity["detail"] = items[3]
+        objects.append(entity)
+
+print(objects[0:10])
+
+args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+
+sc = SparkContext()
+glueContext = GlueContext(sc)
+glue_spark = glueContext.spark_session
+job = Job(glueContext)
+job.init(args['JOB_NAME'], args)
+
+spark = SparkSession.builder.appName("test").getOrCreate()
+df = spark.createDataFrame(objects)
+df.printSchema()
+df = df.select("user_id", "item_id", "ratio", "action", "detail")
+df = df.filter(df["ratio"] > 0)
+
+dyn_df = DynamicFrame.fromDF(df, glueContext, "nested")
+
+glueContext.write_dynamic_frame.from_options(frame=dyn_df,
+                                             connection_type="dynamodb",
+                                             connection_options={"tableName": "demo-ohla-recommand"})
+
+job.commit()
