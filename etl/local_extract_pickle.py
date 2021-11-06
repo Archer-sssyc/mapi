@@ -1,20 +1,13 @@
 import pickle
 import boto3
-import sys
-
-from awsglue.dynamicframe import DynamicFrame
-from awsglue.utils import getResolvedOptions
 from pyspark.sql import SparkSession
-from pyspark.context import SparkContext
-from awsglue.context import GlueContext
-from awsglue.job import Job
 
 file_path = "s3://example-data/ohla/filter_batch_result.pickle"
 objects = list()
 
 s3 = boto3.resource('s3',
                     aws_access_key_id="AKIAQMS6D5EI3FOTFUE4",
-                    aws_secret_access_key="7yGDi5qRGrT+WqlVgaFWoVIrB7eIahT50/qs1QWy",
+                    aws_secret_access_key="your key",
                     region_name="cn-northwest-1")
 bucket = s3.Bucket('example-data')
 data = bucket.Object("ohla/filter_batch_result.pickle").get()['Body'].read()
